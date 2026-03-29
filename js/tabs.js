@@ -42,11 +42,10 @@ import sys
 import os
 if os.path.exists('mrpython'):
     sys.path.append(os.path.abspath('mrpython'))
-    print("Dossier mrpython détecté et ajouté au path.")
 else:
     print("Dossier mrpython non trouvé à la racine.")
     
-sys.path.append('.') # On garde aussi la racine par sécurité
+sys.path.append('.')
         `);
        
         pyodide.runPython("import sys; sys.path.append('.')");
@@ -58,7 +57,6 @@ sys.path.append('.') # On garde aussi la racine par sécurité
     }
 }
 
-// Lancer l'initialisation immédiatement
 initPyodide();
 
 
