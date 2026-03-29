@@ -10,23 +10,28 @@ let historiqueIndex = -1;
 
 /**
  * Affiche un message dans la console.
- * @param {string} message - Le texte à afficher.
- * @param {string} type - 'info' (commande), 'success' (vert), 'error' (rouge), 'output' (résultat)
+ * Chaque ligne du message aura son propre prompt >>>
  */
 function logToConsole(message, type = 'info') {
-    const line = document.createElement('div');
-    line.className = `log-${type}`;
+    if (message === null || message === undefined) return;
 
-    line.innerHTML = `<span class="prompt">>>></span> ${message}`;
-    line.innerHTML = `${prompt}${message}`;
-    
-    consoleContent.appendChild(line);
+    const lines = message.toString().trim().split('\n');
+
+    lines.forEach(lineText => {
+        const line = document.createElement('div');
+        line.className = `log-${type}`;
+        
+        const promptHTML = '<span class="prompt">>>></span> ';
+        line.innerHTML = `${promptHTML}${lineText}`;
+        
+        consoleContent.appendChild(line);
+    });
     
     consoleContent.scrollTop = consoleContent.scrollHeight;
 }
 
 /**
- * Envoie la commande à Python via le pont main_web
+ * Envoie la commande à Python
  */
 async function evaluerCommande() {
     const command = evalInput.value.trim();
@@ -51,11 +56,11 @@ json.dumps(res)
         const response = JSON.parse(resultJson);
 
         if (response.output) {
-            logToConsole(response.output, "output");
+            logToConsole(response.output, "info");
         }
 
         if (response.result && response.result !== "None") {
-            logToConsole(response.result, "output");
+            logToConsole(response.result, "info");
         }
 
         if (response.error) {
@@ -77,7 +82,7 @@ clearBtn.addEventListener('click', () => {
 // Bouton Eval
 evalBtn.addEventListener('click', evaluerCommande);
 
-// Gestion du clavier
+// Gestion du clavier (Entrée et Flèches)
 evalInput.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') {
         evaluerCommande();
