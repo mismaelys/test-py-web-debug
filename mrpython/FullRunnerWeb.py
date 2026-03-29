@@ -6,7 +6,7 @@ import sys
 import traceback
 from io import StringIO #modification
 
-class FullRunner:
+class FullRunnerWeb:
     """
     Runs a code under the full mode
     """

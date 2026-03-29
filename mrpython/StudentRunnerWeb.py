@@ -42,7 +42,7 @@ def install_locals(locals):
 
     return locals
 
-class StudentRunner:
+class StudentRunnerWeb:
     """
     Runs a code under the student mode
     """
