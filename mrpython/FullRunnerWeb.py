@@ -4,8 +4,7 @@ import ast
 import tokenize
 import sys
 import traceback
-
-import tempfile
+from io import StringIO #modification
 
 class FullRunner:
     """
@@ -27,7 +26,7 @@ class FullRunner:
         """ Run the code """
         basic_interpreter = InteractiveInterpreter(locals=locals)
 
-        with tempfile.TemporaryFile(mode='w+', prefix='interpreter_error') as error_output:
+        with StringIO() as error_output: #modification
         
             original_error = sys.stderr
             sys.stderr = error_output
@@ -38,22 +37,22 @@ class FullRunner:
                     code = compile(self.expr, '<string>', 'eval')
             except:
                 InteractiveInterpreter.showsyntaxerror(self.filename)
-                sys.stderr.seek(0)
-                result = sys.stderr.read()
+                #modification
+                result = error_output.getvalue() #modification
                 self.report.add_compilation_error('error', err_type='SyntaxError', details=result)
                 return False
             else: # No compilation errors here
                 if mode == 'exec':
                     result = basic_interpreter.runcode(code)
 
-                    sys.stderr.seek(0)
-                    result = sys.stderr.read()
+                    #modification
+                    result = error_output.getvalue() #modification
                     if result:
                         self.report.add_compilation_error('error', err_type='SyntaxError', details=result)
                         return False
                     else:
-                        sys.stdout.seek(0)
-                        result = sys.stdout.read()
+                        #modification
+                        result = sys.stdout.getvalue() #modification
                         self.report.set_result(result)
                         return True
 
@@ -87,4 +86,3 @@ class FullRunner:
         result = self.execute_or_eval('eval', locals)
         self.expr = None
         return result
-

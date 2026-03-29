@@ -8,12 +8,12 @@ import traceback
 import os
 import copy
 import re
+from io import StringIO #ajout
 from PreconditionHandler import PreconditionAstLinenoUpdater
 
 from translate import tr
 
-import studentlib.gfx.image
-import studentlib.gfx.img_canvas
+#modification (retrait imports gfx)
 
 import typing
 
@@ -22,22 +22,7 @@ from typechecking.type_ast import PREDEFINED_TYPE_VARIABLES
 
 def install_locals(locals):
     # install the gfx lib
-
-    #locals = { k:v for (k,v) in locs.items() }
-    locals['draw_line'] = studentlib.gfx.image.draw_line
-    locals['line'] = studentlib.gfx.image.draw_line
-    locals['draw_triangle'] = studentlib.gfx.image.draw_triangle
-    locals['triangle'] = studentlib.gfx.image.draw_triangle
-    locals['fill_triangle'] = studentlib.gfx.image.fill_triangle
-    locals['filled_triangle'] = studentlib.gfx.image.fill_triangle
-    locals['draw_ellipse'] = studentlib.gfx.image.draw_ellipse
-    locals['ellipse'] = studentlib.gfx.image.draw_ellipse
-    locals['fill_ellipse'] = studentlib.gfx.image.fill_ellipse
-    locals['filled_ellipse'] = studentlib.gfx.image.fill_ellipse
-    locals['overlay'] = studentlib.gfx.image.overlay
-    locals['underlay'] = studentlib.gfx.image.underlay
-    locals['empty_image'] = studentlib.gfx.image.empty_image
-    locals['show_image'] = studentlib.gfx.img_canvas.show_image
+    #modification (retrait des fonctions gfx non compatibles)
 
     # install the typing module
     locals['Sequence'] = typing.Sequence
@@ -62,21 +47,13 @@ class StudentRunner:
     Runs a code under the student mode
     """
 
-    def __init__(self, tk_root, filename, source, check_tk=True):
+    def __init__(self, filename, source): #modification (retrait tk_root)
         self.filename = filename
         self.source = source
         self.AST = None
         self.report = RunReport()
-        self.tk_root = tk_root
+        #modification (retrait tk_root)
         self.running = True
-
-        if check_tk:
-            ## This is a hack so let's check...
-            try:
-                self.tk_root.nametowidget('.')
-            except:
-                raise ValueError("TK Root is not set (please report)")
-            
 
     def get_report(self):
         """ Return the report """
@@ -100,7 +77,7 @@ class StudentRunner:
             return False
         except Exception as err:
             typ, exc, tb = sys.exc_info()
-            self.report.add_compilation_error('error', str(typ), err.lineno, err.offset, details=str(err))
+            self.report.add_compilation_error('error', str(typ), getattr(err, 'lineno', None), getattr(err, 'offset', None), details=str(err)) #modification
             return False
 
         # No parsing error here
@@ -135,17 +112,14 @@ class StudentRunner:
         except TypeError as err:
             a, b, tb = sys.exc_info()
             filename, lineno, file_type, line = traceback.extract_tb(tb)[-1]
-            err_str = self._extract_error_details(err)
+            #err_str = self._extract_error_details(err) #modification (parfois instable)
             self.report.add_execution_error('error', tr("Type error"), lineno, details=str(err))
             return (False, None)
         except NameError as err:
-            a, b, tb = sys.exc_info() # Get the traceback object
-            # Extract the information for the traceback corresponding to the error
-            # inside the source code : [0] refers to the result = exec(code)
-            # traceback, [1] refers to the last error inside code
+            a, b, tb = sys.exc_info() 
             filename, lineno, file_type, line = traceback.extract_tb(tb)[-1]
-            err_str = self._extract_error_details(err)
-            self.report.add_execution_error('error', tr("Name error (unitialized variable?)"), lineno, details=err_str)
+            #err_str = self._extract_error_details(err) #modification
+            self.report.add_execution_error('error', tr("Name error (unitialized variable?)"), lineno, details=str(err))
             return (False, None)
         except ZeroDivisionError:
             a, b, tb = sys.exc_info()
@@ -156,8 +130,6 @@ class StudentRunner:
             _, _, tb = sys.exc_info()
             lineno=None
             traceb = traceback.extract_tb(tb)
-            #print(traceb)
-            #import pdb ; pdb.set_trace()
             if len(traceb) > 1:
                 _, lineno, _, line = traceb[-1]
             if len(traceb) > 1 and err.args and err.args[0] == "<<<PRECONDITION>>>":
@@ -168,19 +140,15 @@ class StudentRunner:
                 arg_names = []
                 arg_values = []
 
-                source_code = inspect.getsource(code)
-                #matches = re.findall(r'\((.*?)\)', code_tb)
-
+                #modification : l'usage d'inspect peut être limité sur le web
                 try:
+                    source_code = self.source #modification
                     tree = ast.parse(source_code)
-                except SyntaxError as err:
-                    print("Fatal Syntax error (precondition handling, please report)", file=sys.stderr)
-                    raise err
-                for node in ast.walk(tree):
-                    if isinstance(node, ast.FunctionDef):
-                        for argg in node.args.args:
-                            arg_name = argg.arg
-                            arg_names.append(arg_name)
+                    for node in ast.walk(tree):
+                        if isinstance(node, ast.FunctionDef) and node.name == func_name:
+                            for argg in node.args.args:
+                                arg_names.append(argg.arg)
+                except: pass
 
                 arg_values = parse_assertion_arg_values(func_name, code_tb)
 
@@ -189,18 +157,15 @@ class StudentRunner:
                     for i in range(len(arg_names)):
                         arg += "\t" + str(arg_names[i]) + " = " + str(arg_values[i]) + "\n\t"
                 else : 
-                    raise ValueError("Precondition handling fails (wrong parameter/value, please report)")
+                    arg = "" #modification (fallback)
                         
                 if lineno in preconditionsLineno:
-                    self.report.add_execution_error('error', tr(s).format(func_name, lineno, line.split(':', 1)[-1].strip(), arg), assert_lineno)
+                    self.report.add_execution_error('error', tr(s).format(func_name, lineno, line.split(':', 1)[-1].strip() if line else "?", arg), assert_lineno)
             else:
                 self.report.add_execution_error('error', tr("Assertion error (failed test?)") + (f"\n ==> {str(err)}" if str(err) else ""), lineno)
             return (True, None)
         except Exception as err:
-            a, b, tb = sys.exc_info() # Get the traceback object
-            # Extract the information for the traceback corresponding to the error
-            # inside the source code : [0] refers to the result = exec(code)
-            # traceback, [1] refers to the last error inside code
+            a, b, tb = sys.exc_info() 
             lineno=None
             traceb = traceback.extract_tb(tb)
             if len(traceb) > 1:
@@ -209,20 +174,6 @@ class StudentRunner:
                 self.report.add_execution_error('error', a.__name__, lineno, details=str(err))
             else:
                 self.report.add_execution_error('error', "Exception", lineno, details=str(err))
-            return (False, None)
-        except: # catch all the rest
-            a, b, tb = sys.exc_info() # Get the traceback object
-            # Extract the information for the traceback corresponding to the error
-            # inside the source code : [0] refers to the result = exec(code)
-            # traceback, [1] refers to the last error inside code
-            lineno=None
-            traceb = traceback.extract_tb(tb)
-            if len(traceb) > 1:
-                filename, lineno, file_type, line = traceb[-1]
-            if hasattr(a, '__name__'):
-                self.report.add_execution_error('error', a.__name__, lineno, details=str(a))
-            else:
-                self.report.add_execution_error('error', "Unknown Exception", lineno, details=str(a))
             return (False, None)
         finally:
             self.running = False
@@ -241,16 +192,14 @@ class StudentRunner:
             return False
         except Exception as err:
             typ, exc, tb = sys.exc_info()
-            self.report.add_compilation_error('error', str(typ), err.lineno, err.offset, details=str(err))
+            self.report.add_compilation_error('error', str(typ), getattr(err, 'lineno', None), getattr(err, 'offset', None), details=str(err)) #modification
             return False
         (ok, result) = self._exec_or_eval('exec', code, locals, locals)
-        #if not ok:
-        #    return False
 
         # if no error get the output
         if capture_stdout:
-            sys.stdout.seek(0)
-            result = sys.stdout.read()
+            #modification
+            result = sys.stdout.getvalue() if hasattr(sys.stdout, 'getvalue') else "" #modification
             self.report.set_output(result)
 
         return ok
@@ -263,8 +212,8 @@ class StudentRunner:
         if not ok:
             return False
         else:
-            sys.stdout.seek(0)
-            outp = sys.stdout.read()
+            #modification
+            outp = sys.stdout.getvalue() if hasattr(sys.stdout, 'getvalue') else "" #modification
             self.report.set_output(outp)
             self.report.set_result(result)
             return True
@@ -293,18 +242,13 @@ class StudentRunner:
         defined_funs = set()
         funcalls = set()
         for node in self.AST.body:
-            #print("node: {}".format(node))
             if isinstance(node, ast.Assert):
-                #print("assert found: {}".format(node))
                 call_visit = FunCallsVisitor()
                 call_visit.visit(node)
                 self.nb_asserts += 1
                 funcalls.update(call_visit.funcalls)
             elif isinstance(node, ast.FunctionDef):
                 defined_funs.add(node.name)
-
-        #print("defined funs = {}".format(defined_funs))
-        #print("funcalls = {}".format(funcalls))
 
         self.report.nb_defined_funs = len(defined_funs)
 
@@ -334,7 +278,6 @@ class StudentRunner:
             if type_error.is_fatal():
                 fatal_error = True
 
-        #print("fatal_error = ", str(fatal_error))
         return not fatal_error
 
     def add_FunctionPreconditions(self):
@@ -348,16 +291,16 @@ class StudentRunner:
 
 def parse_assertion_arg_values(func_name, code_str):
     """Parsing argumentexpression in assertion call"""
-
+    if not code_str: return [] #ajout
     fn_index = code_str.find(func_name)
     if fn_index == -1:
-        return None
+        return [] #modification
     
     i = fn_index
     while i < len(code_str) and code_str[i] != '(':
         i += 1
     if i >= len(code_str):
-        return None
+        return [] #modification
 
     arg_values = []
     i += 1
@@ -383,7 +326,7 @@ def parse_assertion_arg_values(func_name, code_str):
 
     arg_values.append(arg)
 
-    return arg_values       
+    return arg_values        
 
 class FunCallsVisitor(ast.NodeVisitor):
     def __init__(self):
@@ -394,7 +337,6 @@ class FunCallsVisitor(ast.NodeVisitor):
 
     def visit_Call(self, node):
         if hasattr(node.func, "id"):
-            #print("Function name = {}".format(node.func.id))
             self.funcalls.add(node.func.id)
         self.visit_children(node)
 
@@ -413,7 +355,6 @@ class FunctionDefVisitor(ast.NodeTransformer):
                 lineno = precondition_node.lineno # Is the right assertion lineno
                 PreconditionAstLinenoUpdater(lineno).visit(precondition_node)
                 preconditionsLineno.append(lineno)
-                # print(ast.dump(precondition_node, annotate_fields=True, include_attributes=True, indent=4))
                 assert_node = ast.Assert(test=precondition_node)
                 assert_node.msg = ast.Constant("<<<PRECONDITION>>>")
                 assert_node.lineno = lineno + new_end_lineno
@@ -430,18 +371,3 @@ class FunctionDefVisitor(ast.NodeTransformer):
                 node_res = ast.FunctionDef(node.name,node.args,ast_asserts+node.body,node.decorator_list,node.returns,lineno = node.lineno,col_offset = node.col_offset, end_lineno = node.lineno)
 
             return node_res
-        
-if __name__ == "__main__":
-    # for testing purpose only
-    runner = StudentRunner(None, "toto.py","""
-def f(a : int, b : int) -> int:
-    \"\"\"
-    précondition :
-        a > b and a > 0
-    \"\"\"
-    return a - b
-
-print(f(2,1))
-""", check_tk=False)
-
-    runner.execute(dict(), capture_stdout=False)

@@ -1,8 +1,8 @@
 import sys
 import json
 from io import StringIO
-from StudentRunner import StudentRunner
-from FullRunner import FullRunner
+from StudentRunnerWeb import StudentRunnerWeb
+from FullRunnerWeb import FullRunnerWeb
 
 user_namespace = {}
 
@@ -17,9 +17,9 @@ def run_from_web(filename, source, is_student_mode):
     try:
         is_student = bool(is_student_mode)
         if is_student:
-            runner = StudentRunner(filename, source)
+            runner = StudentRunnerWeb(filename, source)
         else:
-            runner = FullRunner(filename, source)
+            runner = FullRunnerWeb(filename, source)
 
         success = runner.execute(user_namespace)
         report = runner.get_report()
