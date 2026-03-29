@@ -1,26 +1,39 @@
+/* --- SÉLECTEURS --- */
 const consoleContent = document.getElementById('console-content');
 const clearBtn = document.getElementById('clear-console');
 const evalInput = document.getElementById('eval-input');
 const evalBtn = document.getElementById('eval-btn');
 
-// --- GESTION DE L'HISTORIQUE ---
+/* --- GESTION DE L'HISTORIQUE --- */
 let historique = [];
 let historiqueIndex = -1;
 
+/**
+ * Affiche un message dans la console.
+ * @param {string} message - Le texte à afficher.
+ * @param {string} type - 'info' (commande), 'success' (vert), 'error' (rouge), 'output' (résultat)
+ */
 function logToConsole(message, type = 'info') {
     const line = document.createElement('div');
     line.className = `log-${type}`;
     
-    line.innerHTML = `<span class="prompt">>>></span> ${message}`;
+    const prompt = (type === 'info') ? '<span class="prompt">>>></span> ' : '';
+    line.innerHTML = `${prompt}${message}`;
     
     consoleContent.appendChild(line);
     
     consoleContent.scrollTop = consoleContent.scrollHeight;
 }
 
+/**
+ * Envoie la commande à Python via le pont main_web
+ */
 async function evaluerCommande() {
     const command = evalInput.value.trim();
     if (command === "" || !window.isPyodideReady) return;
+
+    historique.push(command);
+    historiqueIndex = historique.length;
 
     logToConsole(command, "info"); 
     evalInput.value = ""; 
@@ -38,30 +51,33 @@ json.dumps(res)
         const response = JSON.parse(resultJson);
 
         if (response.output) {
-            logToConsole(response.output, "info");
+            logToConsole(response.output, "output");
         }
 
         if (response.result && response.result !== "None") {
-            logToConsole(response.result, "info");
+            logToConsole(response.result, "output");
         }
 
         if (response.error) {
-            logToConsole("Erreur : " + response.error, "error");
+            logToConsole(response.error, "error");
         }
 
     } catch (err) {
-        logToConsole("Erreur console : " + err, "error");
+        logToConsole("Erreur interne : " + err, "error");
     }
 }
 
-// --- ÉVÉNEMENTS ---
+/* --- ÉVÉNEMENTS --- */
 
+// Bouton Clear
 clearBtn.addEventListener('click', () => {
-    consoleContent.innerHTML = '';
+    consoleContent.innerHTML = '<div class="log-info"><span class="prompt">>>></span> Console effacée.</div>';
 });
 
+// Bouton Eval
 evalBtn.addEventListener('click', evaluerCommande);
 
+// Gestion du clavier
 evalInput.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') {
         evaluerCommande();
@@ -72,6 +88,7 @@ evalInput.addEventListener('keydown', (e) => {
             evalInput.value = historique[historiqueIndex];
             setTimeout(() => evalInput.setSelectionRange(evalInput.value.length, evalInput.value.length), 0);
         }
+        e.preventDefault();
     } 
     else if (e.key === 'ArrowDown') {
         if (historiqueIndex < historique.length - 1) {
@@ -81,5 +98,6 @@ evalInput.addEventListener('keydown', (e) => {
             historiqueIndex = historique.length;
             evalInput.value = "";
         }
+        e.preventDefault();
     }
 });
