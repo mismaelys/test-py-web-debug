@@ -1,0 +1,91 @@
+/* --- STYLE DU TERMINAL / CONSOLE --- */
+#console-container {
+    background-color: white;
+    border-top: 2px solid #ccc;
+    height: 150px;
+    display: flex;
+    flex-direction: column;
+}
+
+.console-header {
+    background-color: #f0f0f0;
+    padding: 5px 15px;
+    font-size: 13px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid #ddd;
+    color: #666;
+}
+
+#console-content {
+    padding: 10px;
+    font-size: 14px;
+    overflow-y: auto;
+    flex-grow: 1;
+    color: #333;
+    line-height: 1.4;
+}
+
+#clear-console {
+    cursor: pointer;
+    border: 1px solid #ccc;
+    background: white;
+    font-size: 13px;
+    padding: 2px 5px;
+}
+
+#console-eval-bar {
+    display: flex;
+    align-items: center;
+    /*background-color: #50b2e3;*/
+    background-color: rgba(39, 46, 98); 
+    padding: 4px 10px;
+    /*border-top: 1px solid #4092ba;*/
+    border-top: 1px solid rgba(22, 27, 69, 0.849);
+    flex-shrink: 0;
+}
+
+#console-eval-bar .prompt {
+    color: #ffffff;
+    font-weight: bold;
+    margin-right: 8px;
+    user-select: none;
+}
+
+#eval-input {
+    flex: 1;
+    background-color: transparent;
+    border: none;
+    outline: none;
+    font-family: 'Consolas', monospace;
+    font-size: 14px;
+    color: #ffffff;
+    padding: 2px 5px;
+}
+
+#eval-input::placeholder {
+    color: rgba(255, 255, 255, 0.7);
+    font-style: italic;
+}
+
+#eval-btn {
+    cursor: pointer;
+    background-color: rgba(255, 255, 255, 0.2);
+    color: white;
+    border: 1px solid rgba(255, 255, 255, 0.5);
+    padding: 2px 12px;
+    font-size: 14px;
+    font-weight: bold;
+    border-radius: 4px;
+    transition: background 0.2s;
+}
+
+#eval-btn:hover {
+    background-color: rgba(255, 255, 255, 0.4);
+}
+
+.log-info { color: #333; }
+.log-error { color: #d93025; font-weight: bold; }
+.log-success { color: #188038; }
+.prompt { color: #999; margin-right: 5px; }
