@@ -16,8 +16,8 @@ let historiqueIndex = -1;
 function logToConsole(message, type = 'info') {
     const line = document.createElement('div');
     line.className = `log-${type}`;
-    
-    const prompt = (type === 'info') ? '<span class="prompt">>>></span> ' : '';
+
+    line.innerHTML = `<span class="prompt">>>></span> ${message}`;
     line.innerHTML = `${prompt}${message}`;
     
     consoleContent.appendChild(line);
