@@ -1,0 +1,44 @@
+html, body {
+    height: 100%;
+    margin: 0;
+    overflow: hidden; 
+}
+
+body {
+    display: flex;
+    flex-direction: column;
+    background-color: white;
+    font-family: fantasy;
+}
+
+main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    background-color: #1e1e1e;
+    min-height: 0; 
+}
+
+header, #status-bar {
+    flex-shrink: 0;
+}
+
+#resizer {
+    height: 6px;
+    background-color: #ddd;
+    cursor: row-resize;
+    border-top: 1px solid #bbb;
+    border-bottom: 1px solid #bbb;
+    transition: background-color 0.2s;
+    flex-shrink: 0;
+}
+
+#resizer:hover {
+    background-color: #59b0e0;
+}
+
+#console-container {
+    height: 150px; 
+    min-height: 50px;
+    max-height: 80vh;
+}

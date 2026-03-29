@@ -1,0 +1,23 @@
+#status-bar {
+    background-color: #cccccc;
+    display: flex;
+    justify-content: flex-end;
+    border-top: 1px solid #999;
+    font-family: sans-serif;
+    font-size: 11px;
+    height: 22px;
+}
+
+.status-segment {
+    padding: 0 15px;
+    display: flex;
+    align-items: center;
+    border-left: 1px solid #999;
+    color: #333;
+    height: 100%;
+}
+
+#status-position {
+    min-width: 80px;
+    justify-content: center;
+}

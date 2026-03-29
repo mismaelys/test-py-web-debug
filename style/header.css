@@ -1,0 +1,29 @@
+header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 20px;
+}
+
+div.buttons {
+    background-color: rgba(39, 46, 98); 
+    padding: 10px 20px;
+    display: flex;
+    gap: 15px;
+    border-radius: 8px;
+}
+
+div.buttons img {
+    cursor: pointer;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+div.buttons img:hover {
+    box-shadow: 0px 0px 8px 2px rgba(22, 27, 69, 0.849);
+    transform: scale(1.2);
+}
+
+.logo-univ img {
+    height: 60px;
+    width: auto;
+}

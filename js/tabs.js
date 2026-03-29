@@ -1,0 +1,317 @@
+/* --- SÉLECTEURS --- */
+const modeBtn = document.getElementById('mode-btn');
+const saveBtn = document.getElementById('save-btn');
+const runBtn = document.getElementById('run-btn');
+const openBtn = document.getElementById('open-btn');
+const fileInput = document.getElementById('file-input'); // Pour l'ouverture locale
+const newFileBtn = document.getElementById('new-file-btn');
+const tabsContainer = document.getElementById('tabs-container');
+const editorContainer = document.getElementById('editor-container');
+const editor = document.getElementById('code-editor');
+const lineNumbers = document.getElementById('line-numbers');
+const statusMode = document.getElementById('status-mode');
+const statusPosition = document.getElementById('status-position');
+
+/* --- ÉTAT DE L'APPLICATION --- */
+window.isStudentMode = true;
+let isRunning = false;
+let fileContent = {};
+let savedFileContent = {}; 
+
+// AJOUT PYODIDE
+window.pyodide = null;
+window.isPyodideReady = false;
+
+// Fonction pour charger Pyodide au démarrage
+async function initPyodide() {
+    logToConsole("Chargement du moteur Python...", "info");
+    try {
+        pyodide = await loadPyodide({
+            stdout: (text) => logToConsole(text, "info"),
+            stderr: (text) => logToConsole(text, "error")
+        });
+
+        logToConsole("Installation de MrPython...", "info");
+        
+        const response = await fetch("mrpython.zip");
+        const buffer = await response.arrayBuffer();
+
+        pyodide.unpackArchive(buffer, "zip");
+        pyodide.runPython(`
+import sys
+import os
+if os.path.exists('mrpython'):
+    sys.path.append(os.path.abspath('mrpython'))
+    print("Dossier mrpython détecté et ajouté au path.")
+else:
+    print("Dossier mrpython non trouvé à la racine.")
+    
+sys.path.append('.') # On garde aussi la racine par sécurité
+        `);
+       
+        pyodide.runPython("import sys; sys.path.append('.')");
+
+        isPyodideReady = true;
+        logToConsole("MrPython est prêt et chargé !", "success");
+    } catch (err) {
+        logToConsole("Erreur d'initialisation : " + err, "error");
+    }
+}
+
+// Lancer l'initialisation immédiatement
+initPyodide();
+
+
+/* --- FONCTIONS --- */
+
+// Updates line numbers
+function updateLineNumbers() {
+    const lines = editor.value.split('\n').length;
+    lineNumbers.innerHTML = Array(lines).fill(0).map((_, i) => `<span>${i + 1}</span>`).join('');
+}
+
+// Load a tab with its text
+function activateTab(tabElement) {
+    const titleSpan = tabElement.querySelector('.tab-title');
+    const fileName = titleSpan.innerText.replace('*', '');
+
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    tabElement.classList.add('active');
+    
+    editorContainer.style.display = 'flex';
+    editor.value = fileContent[fileName] || "";
+    updateLineNumbers();
+}
+
+function updateCursorInfo() {
+    const text = editor.value;
+    const cursorPos = editor.selectionStart;
+    
+    const textBeforeCursor = text.substring(0, cursorPos);
+    
+    const lines = textBeforeCursor.split('\n');
+    const currentLine = lines.length;
+    
+    const currentCol = lines[lines.length - 1].length + 1;
+
+    statusPosition.innerText = `Li ${currentLine}, Col ${currentCol}`;
+}
+
+// Create a new tab
+function createNewTab(fileName) {
+    const newTab = document.createElement('div');
+    newTab.className = 'tab'; 
+    newTab.innerHTML = `
+        <span class="tab-title">${fileName}</span>
+        <span class="close-tab">×</span>
+    `;
+
+    // Choose tab
+    newTab.addEventListener('click', () => activateTab(newTab));
+
+    // Close tab
+    newTab.querySelector('.close-tab').addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (newTab.querySelector('.tab-title').innerText.endsWith('*')) {
+            if (!confirm("Fichier non sauvegardé. Fermer quand même ?")) return;
+        }
+        delete fileContent[fileName];
+        delete savedFileContent[fileName];
+        newTab.remove();
+        
+        const remaining = document.querySelectorAll('.tab');
+        if (remaining.length > 0) activateTab(remaining[remaining.length - 1]);
+        else editorContainer.style.display = 'none';
+    });
+
+    tabsContainer.appendChild(newTab);
+    activateTab(newTab);
+}
+
+// Save on the computer
+function saveFile() {
+    const activeTab = document.querySelector('.tab.active');
+    if (!activeTab) return;
+
+    const titleSpan = activeTab.querySelector('.tab-title');
+    const fileName = titleSpan.innerText.replace('*', '');
+    const content = editor.value;
+
+    const blob = new Blob([content], { type: "text/plain" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = fileName; 
+    link.click();
+    URL.revokeObjectURL(link.href);
+
+    savedFileContent[fileName] = content;
+    titleSpan.innerText = fileName;
+}
+
+/* --- ÉVÉNEMENTS --- */
+
+// Detect modifications
+editor.addEventListener('input', () => {
+    const activeTab = document.querySelector('.tab.active');
+    if (activeTab) {
+        const titleSpan = activeTab.querySelector('.tab-title');
+        const fileName = titleSpan.innerText.replace('*', '');
+        
+        fileContent[fileName] = editor.value;
+
+        if (fileContent[fileName] !== savedFileContent[fileName]) {
+            if (!titleSpan.innerText.endsWith('*')) titleSpan.innerText = fileName + "*";
+        } else {
+            titleSpan.innerText = fileName;
+        }
+    }
+    updateLineNumbers();
+});
+
+editor.addEventListener('click', updateCursorInfo);
+editor.addEventListener('keyup', updateCursorInfo);
+
+// New file
+newFileBtn.addEventListener('click', () => {
+    let name = prompt("Nom du fichier :");
+    if (name && name.trim() !== "") {
+        name = name.trim();
+        if (!name.toLowerCase().endsWith(".py")) name += ".py";
+        
+        if (!fileContent[name]) {
+            fileContent[name] = ""; 
+            savedFileContent[name] = "";
+            createNewTab(name);
+        } else {
+            alert("Ce fichier est déjà ouvert !");
+        }
+    }
+});
+
+// Open a file
+openBtn.addEventListener('click', () => fileInput.click());
+
+fileInput.addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+        const content = event.target.result;
+        const name = file.name;
+
+        // File already opened
+        const tabs = Array.from(document.querySelectorAll('.tab-title'));
+        const existing = tabs.find(t => t.innerText.replace('*','') === name);
+
+        if (existing) {
+            activateTab(existing.parentElement);
+        } else {
+            fileContent[name] = content;
+            savedFileContent[name] = content;
+            createNewTab(name);
+        }
+    };
+    reader.readAsText(file);
+    fileInput.value = "";
+});
+
+// Save
+saveBtn.addEventListener('click', saveFile);
+
+// Change mode
+modeBtn.addEventListener('click', () => {
+    isStudentMode = !isStudentMode;
+    modeBtn.src = isStudentMode ? "images/student_icon2.gif" : "images/pro_icon3.gif";
+    statusMode.innerText = isStudentMode ? "Mode Étudiant" : "Mode Expert";
+    logToConsole(`Passage en ${isStudentMode ? "Mode Étudiant" : "Mode Expert"}`, "info");
+});
+
+// Run
+/*
+runBtn.addEventListener('click', () => {
+    if (isRunning) return;
+
+    const activeTab = document.querySelector('.tab.active');
+    if (!activeTab) {
+        logToConsole("Erreur : Aucun fichier ouvert !", "error");
+        return;
+    }
+
+    const fileName = activeTab.querySelector('.tab-title').innerText.replace('*', '');
+    
+    isRunning = true;
+    runBtn.src = "images/stop_icon2.gif";
+
+    logToConsole(`Lancement de ${fileName}...`, "info");
+
+    setTimeout(() => {
+        runBtn.src = "images/run_icon2.gif";
+        isRunning = false;
+        
+        logToConsole(`Exécution de ${fileName} terminée avec succès.`, "success");
+    }, 2000);
+});*/
+
+//AJOUT PYODIDE
+
+runBtn.addEventListener('click', async () => {
+    if (!window.isPyodideReady) return;
+    
+    const activeTab = document.querySelector('.tab.active');
+    if (!activeTab) return;
+
+    const fileName = activeTab.querySelector('.tab-title').innerText.replace('*', '');
+    const code = editor.value;
+
+    isRunning = true;
+    runBtn.src = "images/stop_icon2.gif";
+    logToConsole(`Analyse et exécution de ${fileName}...`, "info");
+
+    try {
+        pyodide.globals.set("web_code", code);
+        pyodide.globals.set("web_filename", fileName);
+        pyodide.globals.set("is_student", window.isStudentMode);
+
+        const result = await pyodide.runPythonAsync(`
+import main_web
+import json
+res = main_web.run_from_web(web_filename, web_code, is_student)
+json.dumps(res)
+        `.trim());
+
+        const response = JSON.parse(result);
+
+        if (response.errors_list && response.errors_list.length > 0) {
+            response.errors_list.forEach(err => logToConsole(err, "error"));
+        }
+
+        if (response.feedback && response.feedback.length > 0) {
+            response.feedback.forEach(msg => logToConsole(msg, "success"));
+        }
+
+        if (response.output) {
+            logToConsole(response.output, "info");
+        }
+
+        if (window.isStudentMode && response.success) {
+            const nb = response.nb_tests;
+            logToConsole(`Les ${nb} tests sont passés avec succès`, "success");
+        }
+
+    } catch (err) {
+        logToConsole("Erreur : " + err, "error");
+    } finally {
+        runBtn.src = "images/run_icon2.gif";
+        isRunning = false;
+    }
+});
+
+/* --- RACCOURCIS CLAVIER --- */
+
+window.addEventListener('keydown', (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+        e.preventDefault();
+        saveFile();
+    }
+});

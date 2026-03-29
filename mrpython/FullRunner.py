@@ -1,0 +1,78 @@
+from code import InteractiveInterpreter
+from RunReport import RunReport
+import ast
+import tokenize
+import sys
+import traceback
+from io import StringIO
+
+class FullRunner:
+    """
+    Runs a code under the full mode
+    """
+    
+    def __init__(self, filename, source):
+        self.filename = filename
+        self.source = source
+        self.report = RunReport()        
+
+    def get_report(self):
+        """ Return the report """
+        return self.report
+
+    def execute_or_eval(self, mode, locals):
+        """ Run the code """
+        basic_interpreter = InteractiveInterpreter(locals=locals)
+
+        error_output = StringIO()
+        
+        original_error = sys.stderr
+        sys.stderr = error_output
+        
+        try:
+            if mode == 'exec':
+                code = compile(self.source, self.filename, 'exec')
+            else:
+                code = compile(self.expr, '<string>', 'eval')
+        except:
+            InteractiveInterpreter.showsyntaxerror(self.filename)
+            result = error_output.getvalue()
+            self.report.add_compilation_error('error', err_type='SyntaxError', details=result)
+            return False
+        else: 
+            if mode == 'exec':
+                result = basic_interpreter.runcode(code)
+
+                result_err = error_output.getvalue()
+                if result_err:
+                    self.report.add_compilation_error('error', err_type='SyntaxError', details=result_err)
+                    return False
+                else:
+                    if hasattr(sys.stdout, 'getvalue'):
+                        self.report.set_result(sys.stdout.getvalue())
+                    return True
+
+            else: # mode eval
+                try:
+                    result = eval(code, locals, locals)
+                except Exception as err:
+                    a, b, tb = sys.exc_info()
+                    filename, lineno, file_type, line = traceback.extract_tb(tb)[1]
+                    tb_str = "".join(traceback.format_exception_only(a, b))
+                    self.report.add_execution_error('error', a.__name__, details=str(err))
+                    return False
+
+                self.report.set_result(result)
+                return True
+
+        finally:
+            sys.stderr = original_error
+
+    def execute(self, locals):
+        return self.execute_or_eval('exec', locals)
+
+    def evaluate(self, expr, locals):
+        self.expr = expr
+        result = self.execute_or_eval('eval', locals)
+        self.expr = None
+        return result

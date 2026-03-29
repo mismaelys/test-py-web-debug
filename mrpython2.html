@@ -1,0 +1,66 @@
+<!DOCTYPE html> 
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="fr" lang="fr">
+    <head>
+        <meta charset="UTF-8"/> 
+        <title>MrPython</title>
+        <meta name="author" content="Maëlys"/>
+        
+        <link rel="stylesheet" href="style/layout.css">
+        <link rel="stylesheet" href="style/header.css">
+        <link rel="stylesheet" href="style/editor.css">
+        <link rel="stylesheet" href="style/console.css">
+        <link rel="stylesheet" href="style/status.css">
+    </head>
+
+    <body>
+        <header>
+            <div class="buttons">
+                <img src="images/new_file_icon4.gif" alt="new-file" title="Nouveau fichier" id="new-file-btn"/>
+                <img src="images/open_icon2.gif" alt="open" title="Ouvrir" id="open-btn"/>
+                <img src="images/save_icon2.gif" alt="save" title="Enregistrer" id="save-btn"/>
+                <img src="images/student_icon2.gif" alt="mode" title="Changer de mode" id="mode-btn"/>
+                <img src="images/run_icon2.gif" alt="run" title="Exécuter" id="run-btn"/>
+            </div>
+            <div class="logo-univ">
+                <img src="images/sorbonne-universite-sciences-logo_no-bg.png" alt="logo-univ" title="Sorbonne-Université"/>
+            </div>
+        </header>
+
+        <main>
+            <div class="tabs-container" id="tabs-container">
+                </div>
+
+            <div class="editor-container" id="editor-container" style="display: none;">
+                <div class="line-numbers" id="line-numbers"></div>
+                <textarea class="code-input" id="code-editor" spellcheck="false"></textarea>
+            </div>
+        </main>
+
+        <div id="resizer"></div>
+
+        <div id="console-container">
+            <div class="console-header">
+                <span>Console</span>
+                <button id="clear-console">Clear</button>
+            </div>
+            <div id="console-content">
+                <span class="prompt">>>></span> Bienvenue dans MrPython.
+            </div>
+            <div id="console-eval-bar">
+                <span class="prompt">>>></span>
+                <input type="text" id="eval-input" placeholder="Entrez une expression à évaluer..."/>
+                <button id="eval-btn">Eval</button>
+            </div>
+        </div>
+
+        <footer id="status-bar">
+            <div class="status-segment" id="status-mode">Mode Étudiant</div>
+            <div class="status-segment" id="status-position">Li 1, Col 1</div>
+            <div class="status-segment" id="status-python">Python 3.12.5</div>
+        </footer>
+
+        <script src="js/console.js"></script>
+        <script src="js/tabs2.js"></script>
+        <script src="js/resizer.js"></script>
+    </body>
+</html>
