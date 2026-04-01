@@ -19,6 +19,7 @@ window.pyodide = null;
 let isRunning = false;
 let fileContent = {};
 let savedFileContent = {}; 
+let fileHandles = {};
 
 // Fonction pour charger Pyodide au démarrage
 async function initPyodide() {
@@ -101,21 +102,38 @@ function createNewTab(fileName) {
     activateTab(newTab);
 }
 
-function saveFile() {
+async function saveFile() {
     const activeTab = document.querySelector('.tab.active');
     if (!activeTab) return;
     const titleSpan = activeTab.querySelector('.tab-title');
     const fileName = titleSpan.innerText.replace('*', '');
     const content = editor.value;
-    const blob = new Blob([content], { type: "text/plain" });
-    const link = document.createElement("a");
-    link.href = URL.createObjectURL(blob);
-    link.download = fileName; 
-    link.click();
-    URL.revokeObjectURL(link.href);
-    savedFileContent[fileName] = content;
-    fileContent[fileName] = content;
-    updateTabStatus(activeTab, fileName);
+    try {
+        let handle = fileHandles[fileName];
+
+        if (!handle) {
+            handle = await window.showSaveFilePicker({
+                suggestedName: fileName,
+                types: [{
+                    description: 'Python Files',
+                    accept: { 'text/plain': ['.py'] },
+                }],
+            });
+            fileHandles[fileName] = handle;
+        }
+
+        const writable = await handle.createWritable();
+        await writable.write(content);
+        await writable.close();
+        savedFileContent[fileName] = content;
+        updateTabStatus(activeTab, fileName);
+        logToConsole(`Fichier ${fileName} enregistré.`, "success");
+    } catch (err) {
+        if (err.name !== 'AbortError') {
+            console.error(err);
+            alert("Erreur lors de la sauvegarde.");
+        }
+    }
 }
 
 function updateTabStatus(tabElement, fileName) {
@@ -133,7 +151,6 @@ editor.addEventListener('input', () => {
         const titleSpan = activeTab.querySelector('.tab-title');
         const fileName = titleSpan.innerText.replace('*', '');
         fileContent[fileName] = editor.value;
-        // On délègue la vérification de l'étoile à notre fonction
         updateTabStatus(activeTab, fileName);
     }
     updateLineNumbers();
@@ -157,7 +174,32 @@ newFileBtn.addEventListener('click', () => {
     }
 });
 
-openBtn.addEventListener('click', () => fileInput.click());
+openBtn.addEventListener('click', async () => {
+    try {
+        const [handle] = await window.showOpenFilePicker({
+            types: [{
+                description: 'Python Files',
+                accept: { 'text/plain': ['.py'] },
+            }],
+            multiple: false
+        });
+
+        const file = await handle.getFile();
+        const content = await file.text();
+        const name = file.name;
+
+        if (!fileContent[name]) {
+            fileContent[name] = content;
+            savedFileContent[name] = content;
+            fileHandles[name] = handle;
+            createNewTab(name);
+        } else {
+            activateTab(document.querySelector(`.tab-title`)); // Simplifié pour l'exemple
+        }
+    } catch (err) {
+        if (err.name !== 'AbortError') console.error(err);
+    }
+});
 
 fileInput.addEventListener('change', (e) => {
     const file = e.target.files[0];
