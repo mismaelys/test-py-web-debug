@@ -153,7 +153,6 @@ async function saveFile() {
 function confirmSave(tabElement, fileName, content) {
     savedFileContent[fileName] = content;
     updateTabStatus(tabElement, fileName);
-    logToConsole(`Fichier ${fileName} enregistré.`, "success");
 }
 
 function handleOpenFile(name, content, handle) {
@@ -295,5 +294,20 @@ window.addEventListener('keydown', (e) => {
     if ((e.ctrlKey || e.metaKey) && e.key === 's') {
         e.preventDefault();
         saveFile();
+    }
+});
+
+/* --- SÉCURITÉ FERMETURE FENÊTRE --- */
+
+window.addEventListener('beforeunload', (e) => {
+    const filenames = Object.keys(fileContent);
+    const hasUnsavedChanges = filenames.some(name => {
+        return fileContent[name] !== savedFileContent[name];
+    });
+
+    if (hasUnsavedChanges) {
+        e.preventDefault();
+        e.returnValue = ''; 
+        return ''; 
     }
 });
