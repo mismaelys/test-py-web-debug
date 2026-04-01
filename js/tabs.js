@@ -66,6 +66,7 @@ function activateTab(tabElement) {
     tabElement.classList.add('active');
     editorContainer.style.display = 'flex';
     editor.value = fileContent[fileName] || "";
+    updateTabStatus(tabElement, fileName);
     updateLineNumbers();
 }
 
@@ -113,7 +114,15 @@ function saveFile() {
     link.click();
     URL.revokeObjectURL(link.href);
     savedFileContent[fileName] = content;
-    titleSpan.innerText = fileName;
+    fileContent[fileName] = content;
+    updateTabStatus(activeTab, fileName);
+}
+
+function updateTabStatus(tabElement, fileName) {
+    const titleSpan = tabElement.querySelector('.tab-title');
+    const isDirty = fileContent[fileName] !== savedFileContent[fileName];
+    
+    titleSpan.innerText = isDirty ? fileName + "*" : fileName;
 }
 
 /* --- ÉVÉNEMENTS --- */
@@ -124,11 +133,8 @@ editor.addEventListener('input', () => {
         const titleSpan = activeTab.querySelector('.tab-title');
         const fileName = titleSpan.innerText.replace('*', '');
         fileContent[fileName] = editor.value;
-        if (fileContent[fileName] !== savedFileContent[fileName]) {
-            if (!titleSpan.innerText.endsWith('*')) titleSpan.innerText = fileName + "*";
-        } else {
-            titleSpan.innerText = fileName;
-        }
+        // On délègue la vérification de l'étoile à notre fonction
+        updateTabStatus(activeTab, fileName);
     }
     updateLineNumbers();
 });
