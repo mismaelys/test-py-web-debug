@@ -3,6 +3,7 @@ const modeBtn = document.getElementById('mode-btn');
 const saveBtn = document.getElementById('save-btn');
 const runBtn = document.getElementById('run-btn');
 const openBtn = document.getElementById('open-btn');
+const fileInput = document.getElementById('file-input');
 const newFileBtn = document.getElementById('new-file-btn');
 const tabsContainer = document.getElementById('tabs-container');
 const editorContainer = document.getElementById('editor-container');
@@ -110,39 +111,61 @@ function createNewTab(fileName) {
 async function saveFile() {
     const activeTab = document.querySelector('.tab.active');
     if (!activeTab) return;
+    
     const titleSpan = activeTab.querySelector('.tab-title');
     const fileName = titleSpan.innerText.replace('*', '');
     const content = editor.value;
 
-    if (!window.showSaveFilePicker) {
-        alert("La sauvegarde directe nécessite HTTPS ou localhost. Utilisez un navigateur moderne.");
-        return;
+    // ESSAI MÉTHODE 1 : Sauvegarde directe
+    if (window.showSaveFilePicker) {
+        try {
+            let handle = fileHandles[fileName];
+            if (!handle) {
+                handle = await window.showSaveFilePicker({
+                    suggestedName: fileName,
+                    types: [{ description: 'Python Files', accept: { 'text/x-python': ['.py'] } }],
+                });
+                fileHandles[fileName] = handle;
+            }
+            const writable = await handle.createWritable();
+            await writable.write(content);
+            await writable.close();
+            
+            confirmSave(activeTab, fileName, content);
+            return;
+        } catch (err) {
+            if (err.name === 'AbortError') return;
+            console.warn("Méthode moderne bloquée, passage au téléchargement.");
+        }
     }
-    try {
-        let handle = fileHandles[fileName];
 
-        if (!handle) {
-            handle = await window.showSaveFilePicker({
-                suggestedName: fileName,
-                types: [{
-                    description: 'Python Files',
-                    accept: { 'text/x-python': ['.py'] },
-                }],
-            });
-            fileHandles[fileName] = handle;
-        }
+    // MÉTHODE 2 : Téléchargement
+    const blob = new Blob([content], { type: "text/plain" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = fileName; 
+    link.click();
+    URL.revokeObjectURL(link.href);
+    
+    confirmSave(activeTab, fileName, content);
+}
 
-        const writable = await handle.createWritable();
-        await writable.write(content);
-        await writable.close();
-        savedFileContent[fileName] = content;
-        updateTabStatus(activeTab, fileName);
-        logToConsole(`Fichier ${fileName} enregistré.`, "success");
-    } catch (err) {
-        if (err.name !== 'AbortError') {
-            console.error(err);
-            alert("Erreur lors de la sauvegarde.");
-        }
+function confirmSave(tabElement, fileName, content) {
+    savedFileContent[fileName] = content;
+    updateTabStatus(tabElement, fileName);
+    logToConsole(`Fichier ${fileName} enregistré.`, "success");
+}
+
+function handleOpenFile(name, content, handle) {
+    if (!fileContent[name]) {
+        fileContent[name] = content;
+        savedFileContent[name] = content;
+        if (handle) fileHandles[name] = handle;
+        createNewTab(name);
+    } else {
+        const tabs = Array.from(document.querySelectorAll('.tab-title'));
+        const existingTab = tabs.find(t => t.innerText.replace('*','') === name);
+        if (existingTab) activateTab(existingTab.parentElement);
     }
 }
 
@@ -178,41 +201,34 @@ newFileBtn.addEventListener('click', () => {
 });
 
 openBtn.addEventListener('click', async () => {
-    if (!window.showOpenFilePicker) {
-        alert("L'ouverture de fichier moderne nécessite HTTPS.");
-        return;
-    }
-    try {
-        const [handle] = await window.showOpenFilePicker({
-            types: [{
-                description: 'Python Files',
-                accept: { 'text/x-python': ['.py'] },
-            }],
-            multiple: false
-        });
-
-        const file = await handle.getFile();
-        const content = await file.text();
-        const name = file.name;
-
-        // Chercher si un onglet avec ce nom existe déjà
-        const tabs = Array.from(document.querySelectorAll('.tab-title'));
-        const existingTab = tabs.find(t => t.innerText.replace('*','') === name);
-
-        if (existingTab) {
-            activateTab(existingTab.parentElement);
-        } else {
-            fileContent[name] = content;
-            savedFileContent[name] = content;
-            fileHandles[name] = handle;
-            createNewTab(name);
+    // MÉTHODE 1 : Chrome, Edge
+    if (window.showOpenFilePicker) {
+        try {
+            const [handle] = await window.showOpenFilePicker({
+                types: [{ description: 'Python Files', accept: { 'text/x-python': ['.py'] } }],
+                multiple: false
+            });
+            const file = await handle.getFile();
+            const content = await file.text();
+            handleOpenFile(file.name, content, handle);
+            return;
+        } catch (err) {
+            if (err.name !== 'AbortError') console.error(err);
         }
-    } catch (err) {
-        if (err.name !== 'AbortError') console.error(err);
     }
+    fileInput.click();
 });
 
-// L'écouteur fileInput.addEventListener a été supprimé ici car il faisait planter le code
+fileInput.addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+        handleOpenFile(file.name, event.target.result, null);
+    };
+    reader.readAsText(file);
+    fileInput.value = "";
+});
 
 saveBtn.addEventListener('click', saveFile);
 
