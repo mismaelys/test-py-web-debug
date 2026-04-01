@@ -3,7 +3,6 @@ const modeBtn = document.getElementById('mode-btn');
 const saveBtn = document.getElementById('save-btn');
 const runBtn = document.getElementById('run-btn');
 const openBtn = document.getElementById('open-btn');
-const fileInput = document.getElementById('file-input');
 const newFileBtn = document.getElementById('new-file-btn');
 const tabsContainer = document.getElementById('tabs-container');
 const editorContainer = document.getElementById('editor-container');
@@ -30,12 +29,10 @@ async function initPyodide() {
             stderr: (text) => logToConsole(text, "error")
         });
 
-        // Installation silencieuse de l'archive
         const response = await fetch("mrpython.zip");
         const buffer = await response.arrayBuffer();
         window.pyodide.unpackArchive(buffer, "zip");
 
-        // Configuration du path sans aucun print
         window.pyodide.runPython(`
 import sys
 import os
@@ -60,7 +57,14 @@ function updateLineNumbers() {
     lineNumbers.innerHTML = Array(lines).fill(0).map((_, i) => `<span>${i + 1}</span>`).join('');
 }
 
+function updateTabStatus(tabElement, fileName) {
+    const titleSpan = tabElement.querySelector('.tab-title');
+    const isDirty = fileContent[fileName] !== savedFileContent[fileName];
+    titleSpan.innerText = isDirty ? fileName + "*" : fileName;
+}
+
 function activateTab(tabElement) {
+    if (!tabElement) return;
     const titleSpan = tabElement.querySelector('.tab-title');
     const fileName = titleSpan.innerText.replace('*', '');
     document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
@@ -93,6 +97,7 @@ function createNewTab(fileName) {
         }
         delete fileContent[fileName];
         delete savedFileContent[fileName];
+        delete fileHandles[fileName];
         newTab.remove();
         const remaining = document.querySelectorAll('.tab');
         if (remaining.length > 0) activateTab(remaining[remaining.length - 1]);
@@ -108,6 +113,11 @@ async function saveFile() {
     const titleSpan = activeTab.querySelector('.tab-title');
     const fileName = titleSpan.innerText.replace('*', '');
     const content = editor.value;
+
+    if (!window.showSaveFilePicker) {
+        alert("La sauvegarde directe nécessite HTTPS ou localhost. Utilisez un navigateur moderne.");
+        return;
+    }
     try {
         let handle = fileHandles[fileName];
 
@@ -116,7 +126,7 @@ async function saveFile() {
                 suggestedName: fileName,
                 types: [{
                     description: 'Python Files',
-                    accept: { 'text/plain': ['.py'] },
+                    accept: { 'text/x-python': ['.py'] },
                 }],
             });
             fileHandles[fileName] = handle;
@@ -134,13 +144,6 @@ async function saveFile() {
             alert("Erreur lors de la sauvegarde.");
         }
     }
-}
-
-function updateTabStatus(tabElement, fileName) {
-    const titleSpan = tabElement.querySelector('.tab-title');
-    const isDirty = fileContent[fileName] !== savedFileContent[fileName];
-    
-    titleSpan.innerText = isDirty ? fileName + "*" : fileName;
 }
 
 /* --- ÉVÉNEMENTS --- */
@@ -175,11 +178,15 @@ newFileBtn.addEventListener('click', () => {
 });
 
 openBtn.addEventListener('click', async () => {
+    if (!window.showOpenFilePicker) {
+        alert("L'ouverture de fichier moderne nécessite HTTPS.");
+        return;
+    }
     try {
         const [handle] = await window.showOpenFilePicker({
             types: [{
                 description: 'Python Files',
-                accept: { 'text/plain': ['.py'] },
+                accept: { 'text/x-python': ['.py'] },
             }],
             multiple: false
         });
@@ -188,38 +195,24 @@ openBtn.addEventListener('click', async () => {
         const content = await file.text();
         const name = file.name;
 
-        if (!fileContent[name]) {
+        // Chercher si un onglet avec ce nom existe déjà
+        const tabs = Array.from(document.querySelectorAll('.tab-title'));
+        const existingTab = tabs.find(t => t.innerText.replace('*','') === name);
+
+        if (existingTab) {
+            activateTab(existingTab.parentElement);
+        } else {
             fileContent[name] = content;
             savedFileContent[name] = content;
             fileHandles[name] = handle;
             createNewTab(name);
-        } else {
-            activateTab(document.querySelector(`.tab-title`)); // Simplifié pour l'exemple
         }
     } catch (err) {
         if (err.name !== 'AbortError') console.error(err);
     }
 });
 
-fileInput.addEventListener('change', (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (event) => {
-        const content = event.target.result;
-        const name = file.name;
-        const tabs = Array.from(document.querySelectorAll('.tab-title'));
-        const existing = tabs.find(t => t.innerText.replace('*','') === name);
-        if (existing) activateTab(existing.parentElement);
-        else {
-            fileContent[name] = content;
-            savedFileContent[name] = content;
-            createNewTab(name);
-        }
-    };
-    reader.readAsText(file);
-    fileInput.value = "";
-});
+// L'écouteur fileInput.addEventListener a été supprimé ici car il faisait planter le code
 
 saveBtn.addEventListener('click', saveFile);
 
@@ -257,11 +250,11 @@ json.dumps(res)
 
         const response = JSON.parse(result);
 
-        if (response.errors_list && response.errors_list.length > 0) {
+        if (response.errors_list) {
             response.errors_list.forEach(err => logToConsole(err, "error"));
         }
 
-        if (response.feedback && response.feedback.length > 0) {
+        if (response.feedback) {
             response.feedback.forEach(msg => logToConsole(msg, "success"));
         }
 
