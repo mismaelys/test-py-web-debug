@@ -20,6 +20,8 @@ let isRunning = false;
 let fileContent = {};
 let savedFileContent = {}; 
 let fileHandles = {};
+let pythonWorker = null;
+let isWorkerReady = false;
 
 // Fonction pour charger Pyodide au démarrage
 async function initPyodide() {
@@ -51,6 +53,31 @@ sys.path.append('.')
 
 initPyodide();
 
+function initWorker() {
+    pythonWorker = new Worker('js/pyodide-worker.js');
+    
+    pythonWorker.onmessage = (e) => {
+        const { type, content } = e.data;
+        
+        if (type === 'ready') {
+            isWorkerReady = true;
+            logToConsole("Moteur Python prêt (Worker).", "success");
+        } 
+        else if (type === 'stdout') logToConsole(content, "info");
+        else if (type === 'stderr') logToConsole(content, "error");
+        else if (type === 'result') {
+            handlePythonResult(content);
+            finishRun(); // On ne tue plus le worker ici !
+        }
+        else if (type === 'error') {
+            logToConsole("Erreur : " + content, "error");
+            finishRun();
+        }
+    };
+}
+
+initWorker();
+
 /* --- FONCTIONS --- */
 
 function updateLineNumbers() {
@@ -74,6 +101,7 @@ function activateTab(tabElement) {
     editor.value = fileContent[fileName] || "";
     updateTabStatus(tabElement, fileName);
     updateLineNumbers();
+    tabElement.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
 }
 
 function updateCursorInfo() {
@@ -168,6 +196,50 @@ function handleOpenFile(name, content, handle) {
     }
 }
 
+function finishRun() {
+    isRunning = false;
+    runBtn.src = "images/run_icon2.gif";
+}
+
+function stopPythonManual() {
+    logToConsole("Arrêt forcé du processus...", "error");
+    
+    pythonWorker.terminate();
+    isWorkerReady = false;
+    
+    initWorker();
+    
+    finishRun();
+    logToConsole("Processus arrêté. Redémarrage du moteur...", "info");
+}
+
+tabsContainer.addEventListener('wheel', (e) => {
+    if (e.deltaY !== 0) {
+        e.preventDefault();
+        
+        tabsContainer.scrollLeft += e.deltaY;
+    }
+}, { passive: false });
+
+
+function handlePythonResult(response) {
+    if (response.errors_list && response.errors_list.length > 0) {
+        response.errors_list.forEach(err => logToConsole(err, "error"));
+    }
+
+    if (response.feedback && response.feedback.length > 0) {
+        response.feedback.forEach(msg => logToConsole(msg, "success"));
+    }
+
+    if (response.output) {
+        logToConsole(response.output, "info");
+    }
+
+    if (window.isStudentMode && response.success) {
+        logToConsole(`==> Les ${response.nb_tests} tests sont passés avec succès`, "success");
+    }
+}
+
 /* --- ÉVÉNEMENTS --- */
 
 editor.addEventListener('input', () => {
@@ -238,9 +310,17 @@ modeBtn.addEventListener('click', () => {
     logToConsole(`Passage en ${window.isStudentMode ? "Mode Étudiant" : "Mode Expert"}`, "info");
 });
 
-runBtn.addEventListener('click', async () => {
-    if (!window.isPyodideReady || isRunning) return;
+runBtn.addEventListener('click', () => {
+    if (isRunning) {
+        stopPythonManual();
+        return;
+    }
     
+    if (!isWorkerReady) {
+        logToConsole("Le moteur charge encore, patientez...", "info");
+        return;
+    }
+
     const activeTab = document.querySelector('.tab.active');
     if (!activeTab) return;
 
@@ -249,44 +329,13 @@ runBtn.addEventListener('click', async () => {
 
     isRunning = true;
     runBtn.src = "images/stop_icon2.gif";
-    logToConsole(`Analyse et exécution de ${fileName}...`, "info");
+    logToConsole(`Exécution de ${fileName}...`, "info");
 
-    try {
-        window.pyodide.globals.set("web_code", code);
-        window.pyodide.globals.set("web_filename", fileName);
-        window.pyodide.globals.set("is_student", window.isStudentMode);
-
-        const result = await window.pyodide.runPythonAsync(`
-import main_web
-import json
-res = main_web.run_from_web(web_filename, web_code, is_student)
-json.dumps(res)
-        `.trim());
-
-        const response = JSON.parse(result);
-
-        if (response.errors_list) {
-            response.errors_list.forEach(err => logToConsole(err, "error"));
-        }
-
-        if (response.feedback) {
-            response.feedback.forEach(msg => logToConsole(msg, "success"));
-        }
-
-        if (response.output) {
-            logToConsole(response.output, "info");
-        }
-
-        if (window.isStudentMode && response.success) {
-            logToConsole(`==> Les ${response.nb_tests} tests sont passés avec succès`, "success");
-        }
-
-    } catch (err) {
-        logToConsole("Erreur : " + err, "error");
-    } finally {
-        runBtn.src = "images/run_icon2.gif";
-        isRunning = false;
-    }
+    pythonWorker.postMessage({
+        code: code,
+        filename: fileName,
+        is_student: window.isStudentMode
+    });
 });
 
 /* --- RACCOURCIS CLAVIER --- */

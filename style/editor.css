@@ -2,8 +2,16 @@
 .tabs-container {
     background-color: #d3d3d3;
     display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
     padding-top: 5px;
     gap: 2px;
+    
+    /* --- AJOUTS POUR LE SCROLL --- */
+    overflow-x: auto;
+    overflow-y: hidden;
+    width: 100%;
+    flex-shrink: 0;
 }
 
 .tab {
@@ -20,6 +28,16 @@
     border: 1px solid #333;
     border-bottom: none;
     user-select: none;
+    
+    flex: 0 0 auto;
+}
+
+.tabs-container::-webkit-scrollbar {
+    height: 4px;
+}
+.tabs-container::-webkit-scrollbar-thumb {
+    background-color: #888;
+    border-radius: 10px;
 }
 
 .tab.active {
